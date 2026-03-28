@@ -400,6 +400,8 @@ paths:
     post:
       tags: [Houses]
       summary: Create a new house
+      security:
+        - bearerAuth: []
       requestBody:
         required: true
         content:
@@ -415,39 +417,62 @@ paths:
                 $ref: '#/components/schemas/IdResponse'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
 
     get:
       tags: [Houses]
-      summary: List houses
+      summary: List all houses
       description: |
-        Returns all houses with paging.
+        Returns all houses with paging support, regardless of availability.
+        To filter by availability for a specific period, use `GET /houses/available`.
+      parameters:
+        - $ref: '#/components/parameters/querySkip'
+        - $ref: '#/components/parameters/queryLimit'
+      responses:
+        '200':
+          description: List of all houses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HouseResponse'
 
-        If `startDate` and `endDate` are both provided, returns only houses
-        available for the entire requested period.
+  /houses/available:
+    get:
+      tags: [Houses]
+      summary: List available houses for a period
+      description: |
+        Returns only houses that have no booking overlapping the requested period.
+
+        Both `startDate` and `endDate` are **required**.
+        A house is considered unavailable if any existing booking satisfies:
+        `booking.startDate <= endDate AND booking.endDate >= startDate`.
       parameters:
         - $ref: '#/components/parameters/querySkip'
         - $ref: '#/components/parameters/queryLimit'
         - name: startDate
           in: query
-          required: false
+          required: true
           schema:
             type: string
             format: date
           example: "2025-07-01"
-          description: Filter — start of availability period.
+          description: Start of the requested availability period (inclusive).
         - name: endDate
           in: query
-          required: false
+          required: true
           schema:
             type: string
             format: date
           example: "2025-07-07"
-          description: Filter — end of availability period.
+          description: End of the requested availability period (inclusive).
       responses:
         '200':
-          description: List of houses.
+          description: List of available houses for the given period.
           content:
             application/json:
               schema:
