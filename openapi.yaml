@@ -1,0 +1,574 @@
+openapi: 3.0.3
+
+info:
+  title: House Rentals API
+  description: HTTP API for managing house rentals — users, locations, houses and bookings.
+  version: 1.0.0
+
+servers:
+  - url: http://localhost:8080
+    description: Local development server
+
+security: []
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: UUID
+
+  schemas:
+
+    # ── Users ──────────────────────────────────────────────────────────────
+    CreateUserRequest:
+      type: object
+      required: [name, email]
+      properties:
+        name:
+          type: string
+          example: Ana Silva
+        email:
+          type: string
+          format: email
+          example: ana@mail.com
+
+    CreateUserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        token:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Ana Silva
+        email:
+          type: string
+          example: ana@mail.com
+
+    # ── Locations ──────────────────────────────────────────────────────────
+    CreateLocationRequest:
+      type: object
+      required: [name, type]
+      properties:
+        name:
+          type: string
+          example: Lisboa
+        type:
+          type: string
+          enum: [COUNTRY, REGION, DISTRICT, MUNICIPALITY, LOCALITY]
+          example: DISTRICT
+        parentId:
+          type: integer
+          nullable: true
+          example: 1
+
+    LocationResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 2
+        name:
+          type: string
+          example: Lisboa
+        type:
+          type: string
+          enum: [COUNTRY, REGION, DISTRICT, MUNICIPALITY, LOCALITY]
+          example: DISTRICT
+        parentId:
+          type: integer
+          nullable: true
+          example: 1
+
+    # ── Houses ─────────────────────────────────────────────────────────────
+    CreateHouseRequest:
+      type: object
+      required: [title, locationId, areaSqMt, pricePerNight, description]
+      properties:
+        title:
+          type: string
+          example: Casa da Praia
+        locationId:
+          type: integer
+          example: 3
+        areaSqMt:
+          type: integer
+          minimum: 1
+          example: 80
+        pricePerNight:
+          type: number
+          format: double
+          minimum: 0.01
+          example: 120.00
+        description:
+          type: string
+          example: Moradia com vista mar, 3 quartos.
+
+    HouseResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        title:
+          type: string
+          example: Casa da Praia
+        locationId:
+          type: integer
+          example: 3
+        areaSqMt:
+          type: integer
+          example: 80
+        pricePerNight:
+          type: number
+          example: 120.00
+        description:
+          type: string
+          example: Moradia com vista mar, 3 quartos.
+
+    # ── Bookings ───────────────────────────────────────────────────────────
+    CreateBookingRequest:
+      type: object
+      required: [houseId, startDate, endDate]
+      properties:
+        houseId:
+          type: integer
+          example: 1
+        startDate:
+          type: string
+          format: date
+          example: "2025-07-01"
+        endDate:
+          type: string
+          format: date
+          example: "2025-07-07"
+
+    BookingResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        houseId:
+          type: integer
+          example: 1
+        userId:
+          type: integer
+          example: 2
+        startDate:
+          type: string
+          format: date
+          example: "2025-07-01"
+        endDate:
+          type: string
+          format: date
+          example: "2025-07-07"
+
+    # ── Common ─────────────────────────────────────────────────────────────
+    IdResponse:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+          example: House 99 not found
+
+  parameters:
+    pathId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+      example: 1
+
+    querySkip:
+      name: skip
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+      description: Number of items to skip (pagination).
+
+    queryLimit:
+      name: limit
+      in: query
+      required: false
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+      description: Maximum number of items to return.
+
+  responses:
+    NotFound:
+      description: Resource not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: Missing or invalid Bearer token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: Conflict — e.g. duplicate email or booking overlap.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Validation error in request body or parameters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+# ── Paths ─────────────────────────────────────────────────────────────────
+paths:
+
+  # ── Users ─────────────────────────────────────────────────────────────
+  /users:
+    post:
+      tags: [Users]
+      summary: Create a new user
+      description: |
+        Registers a new user and returns an authentication token.
+        The token must be sent in the `Authorization` header for operations that require authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateUserRequest'
+      responses:
+        '201':
+          description: User created successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateUserResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Get user details
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: User found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Locations ─────────────────────────────────────────────────────────
+  /locations:
+    post:
+      tags: [Locations]
+      summary: Create a new location
+      description: |
+        Creates a geographical location. 
+        `COUNTRY` locations must not have a `parentId`.
+        All other types require a `parentId`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: Location created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /locations/{id}:
+    get:
+      tags: [Locations]
+      summary: Get location details
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Location found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LocationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /locations/{id}/children:
+    get:
+      tags: [Locations]
+      summary: Get child locations
+      description: Returns the direct children of the given location, with paging support.
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+        - $ref: '#/components/parameters/querySkip'
+        - $ref: '#/components/parameters/queryLimit'
+      responses:
+        '200':
+          description: List of child locations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LocationResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /locations/{id}/path:
+    get:
+      tags: [Locations]
+      summary: Get full hierarchical path
+      description: |
+        Returns the full path from the root location down to the requested location.
+
+        Example: `Portugal → Lisboa → Oeiras → Paço de Arcos`
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Ordered list from root to the requested location.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LocationResponse'
+              example:
+                - id: 1
+                  name: Portugal
+                  type: COUNTRY
+                  parentId: null
+                - id: 2
+                  name: Lisboa
+                  type: DISTRICT
+                  parentId: 1
+                - id: 3
+                  name: Oeiras
+                  type: MUNICIPALITY
+                  parentId: 2
+                - id: 4
+                  name: Paço de Arcos
+                  type: LOCALITY
+                  parentId: 3
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Houses ────────────────────────────────────────────────────────────
+  /houses:
+    post:
+      tags: [Houses]
+      summary: Create a new house
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateHouseRequest'
+      responses:
+        '201':
+          description: House created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    get:
+      tags: [Houses]
+      summary: List houses
+      description: |
+        Returns all houses with paging.
+
+        If `startDate` and `endDate` are both provided, returns only houses
+        available for the entire requested period.
+      parameters:
+        - $ref: '#/components/parameters/querySkip'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: "2025-07-01"
+          description: Filter — start of availability period.
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: "2025-07-07"
+          description: Filter — end of availability period.
+      responses:
+        '200':
+          description: List of houses.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/HouseResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
+  /houses/{id}:
+    get:
+      tags: [Houses]
+      summary: Get house details
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: House found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HouseResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── Bookings ──────────────────────────────────────────────────────────
+  /bookings:
+    post:
+      tags: [Bookings]
+      summary: Create a booking
+      description: |
+        Creates a booking for an existing house.
+
+        **Requires authentication** — send the user token in the `Authorization` header.
+
+        Returns an error if the house is already booked for any part of the requested period.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBookingRequest'
+      responses:
+        '201':
+          description: Booking created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IdResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /bookings/{id}:
+    get:
+      tags: [Bookings]
+      summary: Get booking details
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+      responses:
+        '200':
+          description: Booking found.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookingResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /houses/{id}/bookings:
+    get:
+      tags: [Bookings]
+      summary: List bookings for a house
+      description: |
+        Returns all bookings for the given house.
+
+        Optionally filter by date interval — returns bookings **fully contained**
+        within `[startDate, endDate]`.
+      parameters:
+        - $ref: '#/components/parameters/pathId'
+        - $ref: '#/components/parameters/querySkip'
+        - $ref: '#/components/parameters/queryLimit'
+        - name: startDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: "2025-07-01"
+        - name: endDate
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date
+          example: "2025-07-31"
+      responses:
+        '200':
+          description: List of bookings.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BookingResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+tags:
+  - name: Users
+    description: User registration and lookup.
+  - name: Locations
+    description: Hierarchical geographical locations.
+  - name: Houses
+    description: House listing and availability.
+  - name: Bookings
+    description: Booking creation and management.
